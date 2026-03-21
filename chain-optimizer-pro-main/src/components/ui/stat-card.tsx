@@ -9,15 +9,19 @@ interface StatCardProps {
   icon: LucideIcon;
   className?: string;
   delay?: number;
+  onClick?: () => void;
+  clickable?: boolean;
 }
 
 export const StatCard: React.FC<StatCardProps> = ({
-  label, value, change, changeType = 'neutral', icon: Icon, className, delay = 0
+  label, value, change, changeType = 'neutral', icon: Icon, className, delay = 0, onClick, clickable
 }) => {
   return (
     <div
+      onClick={onClick}
       className={cn(
         'group rounded-xl border bg-card p-5 shadow-sm transition-shadow duration-200 hover:shadow-md opacity-0 animate-fade-in-up',
+        clickable && 'cursor-pointer hover:border-destructive/60 hover:shadow-destructive/10',
         className
       )}
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
