@@ -1,3 +1,4 @@
+import 'express-async-errors'; // Must be first — patches Express to catch async errors
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

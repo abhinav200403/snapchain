@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import pool from '../config/db';
+import pool, { query } from '../config/db';
 
 // GET /api/orders
 export async function listOrders(req: Request, res: Response): Promise<void> {
   const { status } = req.query;
-  let query = `
+  let sql = `
     SELECT o.id, o.status, o.total_amount, o.expected_delivery, o.notes, o.created_at, o.updated_at,
            s.name AS supplier_name, u.name AS created_by_name
     FROM orders o
@@ -16,11 +16,11 @@ export async function listOrders(req: Request, res: Response): Promise<void> {
 
   if (status) {
     params.push(status);
-    query += ` AND o.status = $${params.length}`;
+    sql += ` AND o.status = $${params.length}`;
   }
 
-  query += ' ORDER BY o.created_at DESC';
-  const result = await pool.query(query, params);
+  sql += ' ORDER BY o.created_at DESC';
+  const result = await query(sql, params);
   res.json(result.rows);
 }
 
@@ -28,7 +28,7 @@ export async function listOrders(req: Request, res: Response): Promise<void> {
 export async function getOrder(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
 
-  const orderRes = await pool.query(
+  const orderRes = await query(
     `SELECT o.*, s.name AS supplier_name, u.name AS created_by_name
      FROM orders o
      LEFT JOIN suppliers s ON s.id = o.supplier_id
@@ -42,7 +42,7 @@ export async function getOrder(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const itemsRes = await pool.query(
+  const itemsRes = await query(
     `SELECT oi.id, oi.quantity, oi.unit_price, p.name AS product_name, p.sku
      FROM order_items oi JOIN products p ON p.id = oi.product_id
      WHERE oi.order_id = $1`,
@@ -119,7 +119,7 @@ export async function updateOrderStatus(req: Request, res: Response): Promise<vo
     return;
   }
 
-  const result = await pool.query(
+  const result = await query(
     `UPDATE orders SET status = $1, updated_at = NOW()
      WHERE id = $2 AND company_id = $3
      RETURNING id, status, updated_at`,

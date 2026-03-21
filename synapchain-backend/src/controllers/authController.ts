@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import pool from '../config/db';
+import pool, { query } from '../config/db';
 import { JwtPayload, AppRole } from '../types';
 
 function generateAccessToken(payload: JwtPayload): string {
@@ -62,7 +62,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     const refreshHash = await hashRefreshToken(refreshToken);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    await pool.query(
+    await query(
       `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
       [user.id, refreshHash, expiresAt]
     );
@@ -89,7 +89,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const result = await pool.query(
+  const result = await query(
     `SELECT u.id, u.email, u.name, u.role, u.password_hash, u.is_active, u.company_id
      FROM users u WHERE u.email = $1`,
     [email.toLowerCase()]
@@ -124,7 +124,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   const refreshHash = await hashRefreshToken(refreshToken);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  await pool.query(
+  await query(
     `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
     [user.id, refreshHash, expiresAt]
   );
@@ -144,7 +144,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const tokens = await pool.query(
+  const tokens = await query(
     `SELECT rt.id, rt.user_id, rt.token_hash, rt.expires_at,
             u.email, u.role, u.company_id, u.is_active, u.name
      FROM refresh_tokens rt
@@ -165,7 +165,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
   }
 
   // Rotate: delete old, issue new
-  await pool.query('DELETE FROM refresh_tokens WHERE id = $1', [matched.id]);
+  await query('DELETE FROM refresh_tokens WHERE id = $1', [matched.id]);
 
   const newAccessToken = generateAccessToken({
     userId: matched.user_id,
@@ -177,7 +177,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
   const newRefreshHash = await hashRefreshToken(newRefreshToken);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  await pool.query(
+  await query(
     `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
     [matched.user_id, newRefreshHash, expiresAt]
   );
@@ -190,14 +190,14 @@ export async function logout(req: Request, res: Response): Promise<void> {
   const { refreshToken } = req.body;
   if (refreshToken && req.user) {
     // Best-effort delete matching token
-    const tokens = await pool.query(
+    const tokens = await query(
       `SELECT id, token_hash FROM refresh_tokens WHERE user_id = $1 AND expires_at > NOW()`,
       [req.user.userId]
     );
     for (const row of tokens.rows) {
       const isMatch = await bcrypt.compare(refreshToken, row.token_hash);
       if (isMatch) {
-        await pool.query('DELETE FROM refresh_tokens WHERE id = $1', [row.id]);
+        await query('DELETE FROM refresh_tokens WHERE id = $1', [row.id]);
         break;
       }
     }
@@ -216,18 +216,18 @@ export async function changePassword(req: Request, res: Response): Promise<void>
     res.status(400).json({ error: 'Password must be at least 8 characters' });
     return;
   }
-  const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user!.userId]);
+  const result = await query('SELECT password_hash FROM users WHERE id = $1', [req.user!.userId]);
   if (result.rows.length === 0) { res.status(404).json({ error: 'User not found' }); return; }
   const valid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
   if (!valid) { res.status(401).json({ error: 'Current password is incorrect' }); return; }
   const newHash = await bcrypt.hash(newPassword, Number(process.env.BCRYPT_ROUNDS) || 12);
-  await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.user!.userId]);
+  await query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, req.user!.userId]);
   res.json({ message: 'Password updated successfully' });
 }
 
 // GET /api/auth/me
 export async function me(req: Request, res: Response): Promise<void> {
-  const result = await pool.query(
+  const result = await query(
     `SELECT u.id, u.email, u.name, u.role, u.is_active, u.company_id, c.name AS company_name
      FROM users u JOIN companies c ON c.id = u.company_id
      WHERE u.id = $1`,
