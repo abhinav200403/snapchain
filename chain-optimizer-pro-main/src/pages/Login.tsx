@@ -131,31 +131,35 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Demo Access</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            {(['admin', 'operations_manager', 'supplier', 'business_analyst'] as AppRole[]).map(role => (
-              <button
-                key={role}
-                onClick={() => handleDemoLogin(role)}
-                disabled={demoLoading !== null}
-                className="group rounded-lg border px-3 py-2.5 text-left transition-all duration-150 hover:border-primary/40 hover:shadow-sm active:scale-[0.98] disabled:opacity-60"
-              >
-                <div className="flex items-center gap-1.5">
-                  {demoLoading === role && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
-                  <p className="text-sm font-medium text-foreground">{ROLE_LABELS[role]}</p>
+          {!email && !password && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Demo Access</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {demoLoading === role ? 'Signing in...' : 'Click to enter'}
-                </p>
-              </button>
-            ))}
-          </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {(['admin', 'operations_manager', 'supplier', 'business_analyst'] as AppRole[]).map(role => (
+                  <button
+                    key={role}
+                    onClick={() => handleDemoLogin(role)}
+                    disabled={demoLoading !== null}
+                    className="group rounded-lg border px-3 py-2.5 text-left transition-all duration-150 hover:border-primary/40 hover:shadow-sm active:scale-[0.98] disabled:opacity-60"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {demoLoading === role && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                      <p className="text-sm font-medium text-foreground">{ROLE_LABELS[role]}</p>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {demoLoading === role ? 'Signing in...' : 'Click to enter'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
