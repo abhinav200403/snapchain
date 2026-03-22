@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import pool from '../config/db';
+import { query } from '../config/db';
 
 // GET /api/shipments
 export async function listShipments(req: Request, res: Response): Promise<void> {
-  const result = await pool.query(
+  const result = await query(
     `SELECT sh.id, sh.tracking_number, sh.carrier, sh.status, sh.origin, sh.destination,
             sh.shipped_at, sh.estimated_arrival, sh.delivered_at, sh.created_at,
             o.id AS order_id
@@ -26,7 +26,7 @@ export async function createShipment(req: Request, res: Response): Promise<void>
   }
 
   if (order_id) {
-    const orderCheck = await pool.query(
+    const orderCheck = await query(
       'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
       [order_id, req.user!.companyId]
     );
@@ -36,7 +36,7 @@ export async function createShipment(req: Request, res: Response): Promise<void>
     }
   }
 
-  const result = await pool.query(
+  const result = await query(
     `INSERT INTO shipments (company_id, order_id, tracking_number, carrier, origin, destination, estimated_arrival, shipped_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
      RETURNING id, tracking_number, carrier, status, origin, destination, shipped_at, estimated_arrival, created_at`,
@@ -45,7 +45,7 @@ export async function createShipment(req: Request, res: Response): Promise<void>
 
   // Update linked order status to 'shipped'
   if (order_id) {
-    await pool.query(
+    await query(
       `UPDATE orders SET status = 'shipped', updated_at = NOW() WHERE id = $1 AND company_id = $2`,
       [order_id, req.user!.companyId]
     );
@@ -67,7 +67,7 @@ export async function updateShipment(req: Request, res: Response): Promise<void>
 
   const deliveredAt = status === 'delivered' ? new Date() : null;
 
-  const result = await pool.query(
+  const result = await query(
     `UPDATE shipments SET
        status = COALESCE($1::shipment_status, status),
        tracking_number = COALESCE($2, tracking_number),
@@ -87,9 +87,9 @@ export async function updateShipment(req: Request, res: Response): Promise<void>
   // If delivered, update linked order
   if (status === 'delivered') {
     const shipment = result.rows[0];
-    const shipFull = await pool.query('SELECT order_id FROM shipments WHERE id = $1', [id]);
+    const shipFull = await query('SELECT order_id FROM shipments WHERE id = $1', [id]);
     if (shipFull.rows[0]?.order_id) {
-      await pool.query(
+      await query(
         `UPDATE orders SET status = 'delivered', updated_at = NOW() WHERE id = $1`,
         [shipFull.rows[0].order_id]
       );

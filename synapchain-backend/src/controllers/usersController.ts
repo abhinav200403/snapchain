@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import pool from '../config/db';
+import { query } from '../config/db';
 import { AppRole } from '../types';
 
 // GET /api/users
 export async function listUsers(req: Request, res: Response): Promise<void> {
-  const result = await pool.query(
+  const result = await query(
     `SELECT id, email, name, role, is_active, created_at FROM users WHERE company_id = $1 ORDER BY created_at DESC`,
     [req.user!.companyId]
   );
@@ -30,14 +30,14 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+  const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
   if (existing.rows.length > 0) {
     res.status(409).json({ error: 'Email already in use' });
     return;
   }
 
   const passwordHash = await bcrypt.hash(password, Number(process.env.BCRYPT_ROUNDS) || 12);
-  const result = await pool.query(
+  const result = await query(
     `INSERT INTO users (company_id, email, name, password_hash, role) VALUES ($1, $2, $3, $4, $5)
      RETURNING id, email, name, role, is_active, created_at`,
     [req.user!.companyId, email.toLowerCase(), name, passwordHash, role]
@@ -56,7 +56,7 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const result = await pool.query(
+  const result = await query(
     `UPDATE users SET
        role = COALESCE($1, role),
        is_active = COALESCE($2, is_active)
@@ -81,7 +81,7 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const result = await pool.query(
+  const result = await query(
     `UPDATE users SET is_active = false WHERE id = $1 AND company_id = $2 RETURNING id`,
     [id, req.user!.companyId]
   );

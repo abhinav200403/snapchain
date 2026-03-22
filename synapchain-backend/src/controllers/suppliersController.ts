@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import pool from '../config/db';
+import { query } from '../config/db';
 
 // GET /api/suppliers
 export async function listSuppliers(req: Request, res: Response): Promise<void> {
-  const result = await pool.query(
+  const result = await query(
     `SELECT id, name, email, phone, rating, lead_time_days, is_active, created_at
      FROM suppliers WHERE company_id = $1 ORDER BY name`,
     [req.user!.companyId]
@@ -19,7 +19,7 @@ export async function createSupplier(req: Request, res: Response): Promise<void>
     return;
   }
 
-  const result = await pool.query(
+  const result = await query(
     `INSERT INTO suppliers (company_id, name, email, phone, rating, lead_time_days)
      VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING id, name, email, phone, rating, lead_time_days, is_active, created_at`,
@@ -33,7 +33,7 @@ export async function updateSupplier(req: Request, res: Response): Promise<void>
   const { id } = req.params;
   const { name, email, phone, rating, lead_time_days, is_active } = req.body;
 
-  const result = await pool.query(
+  const result = await query(
     `UPDATE suppliers SET
        name = COALESCE($1, name),
        email = COALESCE($2, email),
@@ -56,7 +56,7 @@ export async function updateSupplier(req: Request, res: Response): Promise<void>
 // DELETE /api/suppliers/:id
 export async function deleteSupplier(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
-  const result = await pool.query(
+  const result = await query(
     `UPDATE suppliers SET is_active = false WHERE id = $1 AND company_id = $2 RETURNING id`,
     [id, req.user!.companyId]
   );
