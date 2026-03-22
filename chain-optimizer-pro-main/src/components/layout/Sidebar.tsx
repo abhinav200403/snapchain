@@ -88,8 +88,8 @@ export const Sidebar = () => {
         </ul>
       </nav>
 
-      {/* Role switcher (demo) */}
-      {!collapsed && (
+      {/* Role switcher — demo accounts only */}
+      {!collapsed && user.email?.endsWith('@synapchain.ai') && (
         <div className="border-t border-sidebar-border px-3 py-3">
           <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted">
             Demo: Switch Role
