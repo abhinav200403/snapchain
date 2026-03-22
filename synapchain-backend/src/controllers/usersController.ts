@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { query } from '../config/db';
 import { AppRole } from '../types';
+import { sendWelcomeEmail } from '../services/mailer';
 
 // GET /api/users
 export async function listUsers(req: Request, res: Response): Promise<void> {
@@ -42,6 +43,16 @@ export async function createUser(req: Request, res: Response): Promise<void> {
      RETURNING id, email, name, role, is_active, created_at`,
     [req.user!.companyId, email.toLowerCase(), name, passwordHash, role]
   );
+
+  // Fetch company name for the welcome email
+  const companyResult = await query(`SELECT name FROM companies WHERE id = $1`, [req.user!.companyId]);
+  const companyName = companyResult.rows[0]?.name;
+
+  // Send welcome email (non-blocking — don't fail the request if email fails)
+  sendWelcomeEmail({ to: email.toLowerCase(), name, role, password, companyName }).catch(err => {
+    console.error('Welcome email failed to send:', err.message);
+  });
+
   res.status(201).json(result.rows[0]);
 }
 
