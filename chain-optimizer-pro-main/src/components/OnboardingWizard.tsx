@@ -15,7 +15,7 @@ interface Step {
 
 const STEPS_BY_ROLE: Record<string, Step[]> = {
   admin: [
-    { icon: Brain, title: 'Welcome to NeuroChain AI', description: 'You\'re logged in as Administrator. You have full access to all features — inventory, orders, suppliers, users, analytics, and AI predictions.' },
+    { icon: Brain, title: 'Welcome to SynapChain AI', description: 'You\'re logged in as Administrator. You have full access to all features — inventory, orders, suppliers, users, analytics, and AI predictions.' },
     { icon: Users, title: 'Set Up Your Team', description: 'Go to User Management to invite team members and assign roles. You can add operations managers, suppliers, and analysts.', action: { label: 'Go to User Management', path: '/users' } },
     { icon: Package, title: 'Add Your Inventory', description: 'Start by adding your products to the Inventory module. You can also import in bulk using a CSV file.', action: { label: 'Go to Inventory', path: '/inventory' } },
     { icon: ShoppingCart, title: 'Create Your First Order', description: 'Once suppliers and inventory are set up, create purchase orders and track them through the order lifecycle.', action: { label: 'Go to Orders', path: '/orders' } },

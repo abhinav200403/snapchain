@@ -51,7 +51,7 @@ const Login = () => {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
             <Brain className="h-6 w-6 text-primary-foreground" />
           </div>
-          <span className="text-lg font-bold text-background">NeuroChain AI</span>
+          <span className="text-lg font-bold text-background">SynapChain AI</span>
         </div>
         <div className="space-y-6">
           <h2 className="text-4xl font-bold leading-tight text-background" style={{ lineHeight: '1.15' }}>
@@ -73,7 +73,7 @@ const Login = () => {
             ))}
           </div>
         </div>
-        <p className="text-xs text-background/30">© 2026 NeuroChain AI. All rights reserved.</p>
+        <p className="text-xs text-background/30">© 2026 SynapChain AI. All rights reserved.</p>
       </div>
 
       {/* Right panel */}
@@ -84,7 +84,7 @@ const Login = () => {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
                 <Brain className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="font-bold text-foreground">NeuroChain AI</span>
+              <span className="font-bold text-foreground">SynapChain AI</span>
             </div>
           </div>
           <div>
