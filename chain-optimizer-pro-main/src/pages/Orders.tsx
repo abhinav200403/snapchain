@@ -4,7 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RoleGuard } from '@/components/RoleGuard';
-import { Plus, Search, Download, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Search, Download, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CreateOrderDialog } from '@/components/modals/CreateOrderDialog';
 import { exportCSV } from '@/lib/export';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 
 const STATUSES = ['All', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+const PAGE_SIZE = 10;
 const STATUS_LABELS: Record<string, string> = { All: 'All', pending: 'Pending', processing: 'Processing', shipped: 'Shipped', delivered: 'Delivered', cancelled: 'Cancelled' };
 
 const statusColor = (s: string) => {
@@ -26,6 +27,7 @@ const Orders = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [createOpen, setCreateOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isSupplier = user?.role === 'supplier';
@@ -52,6 +54,9 @@ const Orders = () => {
     return matchSearch && matchStatus;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const handleExport = () => {
     exportCSV('orders', orders.map((o: any) => ({
       order_id: o.id.slice(0, 8).toUpperCase(),
@@ -71,13 +76,13 @@ const Orders = () => {
           <div className="flex items-center gap-2">
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search orders..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+              <Input placeholder="Search orders..." className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
             <div className="flex gap-1 rounded-lg border p-1">
               {STATUSES.map(s => (
                 <button
                   key={s}
-                  onClick={() => setStatusFilter(s)}
+                  onClick={() => { setStatusFilter(s); setPage(1); }}
                   className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                     statusFilter === s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
@@ -117,9 +122,9 @@ const Orders = () => {
               <tbody>
                 {isLoading ? (
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
-                ) : filtered.length === 0 ? (
+                ) : paginated.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No orders found</td></tr>
-                ) : filtered.map((o: any) => (
+                ) : paginated.map((o: any) => (
                   <tr key={o.id} className="border-b last:border-0 hover:bg-secondary/20 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground font-mono text-xs">{o.id.slice(0, 8).toUpperCase()}</td>
                     <td className="px-4 py-3 text-foreground">{o.supplier_name ?? '—'}</td>
@@ -178,6 +183,19 @@ const Orders = () => {
               </tbody>
             </table>
           </div>
+          {filtered.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between border-t px-4 py-3">
+              <p className="text-xs text-muted-foreground">{filtered.length} total · Page {page} of {totalPages}</p>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" />Previous
+                </Button>
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                  Next<ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

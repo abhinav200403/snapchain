@@ -4,18 +4,20 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RoleGuard } from '@/components/RoleGuard';
-import { Plus, Search, Star, Clock, Download, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Search, Star, Clock, Download, BarChart3, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AddSupplierDialog } from '@/components/modals/AddSupplierDialog';
 import { exportCSV } from '@/lib/export';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 
 type Tab = 'cards' | 'scorecard';
+const PAGE_SIZE = 8;
 
 const Suppliers = () => {
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('cards');
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: suppliers = [], isLoading } = useQuery({
@@ -27,6 +29,9 @@ const Suppliers = () => {
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.email?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleExport = () => {
     exportCSV('suppliers', suppliers.map((s: any) => ({
@@ -68,7 +73,7 @@ const Suppliers = () => {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search suppliers..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+            <Input placeholder="Search suppliers..." className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleExport}>
@@ -83,8 +88,9 @@ const Suppliers = () => {
         {isLoading ? (
           <div className="text-center text-muted-foreground py-8">Loading...</div>
         ) : tab === 'cards' ? (
+          <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
-            {filtered.map((s: any, i: number) => (
+            {paginated.map((s: any, i: number) => (
               <div key={s.id} className="rounded-xl border bg-card p-5 opacity-0 animate-fade-in-up transition-shadow hover:shadow-md" style={{ animationDelay: `${i * 80}ms`, animationFillMode: 'forwards' }}>
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -118,6 +124,20 @@ const Suppliers = () => {
               </div>
             ))}
           </div>
+          {filtered.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-muted-foreground">{filtered.length} total · Page {page} of {totalPages}</p>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" />Previous
+                </Button>
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                  Next<ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+          </>
         ) : (
           <>
             {/* Summary KPIs */}

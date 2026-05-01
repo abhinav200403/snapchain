@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import pool, { query } from '../config/db';
 import { JwtPayload, AppRole } from '../types';
+import { sendVerificationEmail } from '../services/mailer';
 
 function generateAccessToken(payload: JwtPayload): string {
   return jwt.sign(payload, process.env.JWT_ACCESS_SECRET!, {
@@ -50,7 +51,8 @@ export async function register(req: Request, res: Response): Promise<void> {
 
     const passwordHash = await bcrypt.hash(password, Number(process.env.BCRYPT_ROUNDS) || 12);
     const userRes = await client.query(
-      `INSERT INTO users (company_id, email, name, password_hash, role) VALUES ($1, $2, $3, $4, 'admin') RETURNING id, email, name, role`,
+      `INSERT INTO users (company_id, email, name, password_hash, role, email_verified)
+       VALUES ($1, $2, $3, $4, 'admin', false) RETURNING id, email, name, role`,
       [companyId, email.toLowerCase(), name, passwordHash]
     );
     const user = userRes.rows[0];
@@ -67,10 +69,22 @@ export async function register(req: Request, res: Response): Promise<void> {
       [user.id, refreshHash, expiresAt]
     );
 
+    // Send verification email (non-blocking)
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    const verifyHash = await bcrypt.hash(verifyToken, 8);
+    await query(
+      `INSERT INTO verification_tokens (user_id, token_hash, expires_at)
+       VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
+      [user.id, verifyHash]
+    );
+    sendVerificationEmail({ to: email.toLowerCase(), name, token: verifyToken }).catch(err => {
+      console.error('Verification email failed:', err.message);
+    });
+
     res.status(201).json({
       accessToken,
       refreshToken,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId, emailVerified: false },
     });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -78,6 +92,67 @@ export async function register(req: Request, res: Response): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+// GET /api/auth/verify-email?token=xxx
+export async function verifyEmail(req: Request, res: Response): Promise<void> {
+  const { token } = req.query as { token: string };
+  if (!token) {
+    res.status(400).json({ error: 'Token is required' });
+    return;
+  }
+
+  const tokens = await query(
+    `SELECT vt.id, vt.user_id, vt.token_hash FROM verification_tokens vt
+     WHERE vt.expires_at > NOW()`,
+    []
+  );
+
+  let matched: (typeof tokens.rows)[0] | null = null;
+  for (const row of tokens.rows) {
+    const isMatch = await bcrypt.compare(token, row.token_hash);
+    if (isMatch) { matched = row; break; }
+  }
+
+  if (!matched) {
+    res.status(400).json({ error: 'Invalid or expired verification link' });
+    return;
+  }
+
+  await query(`UPDATE users SET email_verified = true WHERE id = $1`, [matched.user_id]);
+  await query(`DELETE FROM verification_tokens WHERE id = $1`, [matched.id]);
+
+  res.json({ message: 'Email verified successfully' });
+}
+
+// POST /api/auth/resend-verification
+export async function resendVerification(req: Request, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const userRes = await query(
+    `SELECT id, email, name, email_verified FROM users WHERE id = $1`,
+    [userId]
+  );
+  if (userRes.rows.length === 0 || userRes.rows[0].email_verified) {
+    res.json({ message: 'Already verified' });
+    return;
+  }
+
+  const user = userRes.rows[0];
+  await query(`DELETE FROM verification_tokens WHERE user_id = $1`, [userId]);
+
+  const verifyToken = crypto.randomBytes(32).toString('hex');
+  const verifyHash = await bcrypt.hash(verifyToken, 8);
+  await query(
+    `INSERT INTO verification_tokens (user_id, token_hash, expires_at)
+     VALUES ($1, $2, NOW() + INTERVAL '24 hours')`,
+    [userId, verifyHash]
+  );
+
+  sendVerificationEmail({ to: user.email, name: user.name, token: verifyToken }).catch(err => {
+    console.error('Resend verification failed:', err.message);
+  });
+
+  res.json({ message: 'Verification email sent' });
 }
 
 // POST /api/auth/login
@@ -228,7 +303,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
 // GET /api/auth/me
 export async function me(req: Request, res: Response): Promise<void> {
   const result = await query(
-    `SELECT u.id, u.email, u.name, u.role, u.is_active, u.company_id, c.name AS company_name
+    `SELECT u.id, u.email, u.name, u.role, u.is_active, u.company_id, u.email_verified, c.name AS company_name
      FROM users u JOIN companies c ON c.id = u.company_id
      WHERE u.id = $1`,
     [req.user!.userId]
@@ -238,5 +313,5 @@ export async function me(req: Request, res: Response): Promise<void> {
     return;
   }
   const u = result.rows[0];
-  res.json({ id: u.id, name: u.name, email: u.email, role: u.role, companyId: u.company_id, companyName: u.company_name, isActive: u.is_active });
+  res.json({ id: u.id, name: u.name, email: u.email, role: u.role, companyId: u.company_id, companyName: u.company_name, isActive: u.is_active, emailVerified: u.email_verified ?? true });
 }

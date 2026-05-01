@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Input } from '@/components/ui/input';
-import { Search, FileText, ShoppingCart, Truck, Package, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, FileText, ShoppingCart, Truck, Package, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const PAGE_SIZE = 15;
 import api from '@/lib/api';
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
@@ -25,6 +28,7 @@ const FILTER_LABELS: Record<string, string> = { All: 'All', order: 'Orders', shi
 const AuditLog = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
+  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
     queryKey: ['audit', filter],
@@ -40,6 +44,9 @@ const AuditLog = () => {
     return matchSearch;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div>
       <Header title="Audit Log" subtitle="System activity and change history" />
@@ -47,13 +54,13 @@ const AuditLog = () => {
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search logs..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+            <Input placeholder="Search logs..." className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           </div>
           <div className="flex gap-1 rounded-lg border p-1">
             {FILTER_OPTIONS.map(f => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => { setFilter(f); setPage(1); }}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                   filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                 }`}
@@ -66,7 +73,7 @@ const AuditLog = () => {
           <div className="text-center text-muted-foreground py-8">Loading...</div>
         ) : (
           <div className="space-y-2">
-            {filtered.map((log: any, i: number) => {
+            {paginated.map((log: any, i: number) => {
               const type = log.resource ?? 'order';
               const Icon = TYPE_ICONS[type] || FileText;
               return (
@@ -93,8 +100,21 @@ const AuditLog = () => {
                 </div>
               );
             })}
-            {filtered.length === 0 && (
+            {paginated.length === 0 && (
               <div className="text-center text-muted-foreground py-8">No logs found</div>
+            )}
+            {filtered.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-xs text-muted-foreground">{filtered.length} total · Page {page} of {totalPages}</p>
+                <div className="flex gap-1">
+                  <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                    <ChevronLeft className="h-3.5 w-3.5 mr-1" />Previous
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                    Next<ChevronRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         )}

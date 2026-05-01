@@ -16,7 +16,9 @@ import shipmentRoutes from './routes/shipments';
 import analyticsRoutes from './routes/analytics';
 import predictionsRoutes from './routes/predictions';
 import auditRoutes from './routes/auditLog';
+import companyRoutes from './routes/company';
 import { errorHandler } from './middleware/errorHandler';
+import { runMigrations } from './config/migrate';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -56,6 +58,7 @@ app.use('/api/shipments', shipmentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/predictions', predictionsRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/company', companyRoutes);
 
 // 404
 app.use((_req, res) => {
@@ -64,6 +67,8 @@ app.use((_req, res) => {
 
 // Global error handler
 app.use(errorHandler);
+
+runMigrations().catch(err => console.error('Migration error:', err.message));
 
 app.listen(PORT, () => {
   console.log(`SynapChain API running on port ${PORT} [${process.env.NODE_ENV}]`);

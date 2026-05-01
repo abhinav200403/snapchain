@@ -24,6 +24,7 @@ import AuditLog from "./pages/AuditLog";
 import ProfilePage from "./pages/ProfilePage";
 import BillingPage from "./pages/BillingPage";
 import NotFound from "./pages/NotFound";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<Dashboard />} />

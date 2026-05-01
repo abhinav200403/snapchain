@@ -4,18 +4,23 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RoleGuard } from '@/components/RoleGuard';
-import { Plus, Search, Package, Edit2, Trash2, Download, Upload, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Package, Edit2, Trash2, Download, Upload, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AddProductDialog } from '@/components/modals/AddProductDialog';
+import { EditProductDialog } from '@/components/modals/EditProductDialog';
 import { exportCSV } from '@/lib/export';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 
 type Tab = 'all' | 'low_stock';
+const PAGE_SIZE = 10;
 
 const Inventory = () => {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<Tab>('all');
   const [addOpen, setAddOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<any | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +39,9 @@ const Inventory = () => {
   const filtered = tab === 'low_stock' ? lowStock.filter((p: any) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   ) : allFiltered;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleExport = () => {
     exportCSV('inventory', products.map((p: any) => ({
@@ -61,7 +69,6 @@ const Inventory = () => {
           const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
           return Object.fromEntries(headers.map((h, i) => [h, vals[i] ?? '']));
         });
-        // POST each row
         let success = 0;
         for (const row of rows) {
           try {
@@ -86,6 +93,22 @@ const Inventory = () => {
     reader.readAsText(file);
   };
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    setDeletingId(id);
+    try {
+      await api.delete(`/inventory/${id}`);
+      toast.success('Product deleted');
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? 'Failed to delete product');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['inventory'] });
+
   return (
     <div>
       <Header title="Inventory" subtitle="Manage products and stock levels" />
@@ -95,7 +118,7 @@ const Inventory = () => {
           {(['all', 'low_stock'] as Tab[]).map(t => (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => { setTab(t); setPage(1); }}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 tab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -109,7 +132,7 @@ const Inventory = () => {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search products..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+            <Input placeholder="Search products..." className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleExport}>
@@ -154,11 +177,11 @@ const Inventory = () => {
               <tbody>
                 {isLoading ? (
                   <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
-                ) : filtered.length === 0 ? (
+                ) : paginated.length === 0 ? (
                   <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                     {tab === 'low_stock' ? 'No low stock items — all products are well stocked!' : 'No products found'}
                   </td></tr>
-                ) : filtered.map((p: any) => {
+                ) : paginated.map((p: any) => {
                   const isLow = p.low_stock || p.stock_quantity <= p.reorder_level;
                   return (
                     <tr key={p.id} className={`border-b last:border-0 hover:bg-secondary/20 transition-colors ${isLow ? 'bg-warning/5' : ''}`}>
@@ -180,12 +203,21 @@ const Inventory = () => {
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           <RoleGuard allowed={['admin', 'operations_manager']}>
-                            <button className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
+                            <button
+                              onClick={() => setEditProduct(p)}
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                              title="Edit product"
+                            >
                               <Edit2 className="h-3.5 w-3.5" />
                             </button>
                           </RoleGuard>
                           <RoleGuard allowed={['admin']}>
-                            <button className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                            <button
+                              onClick={() => handleDelete(p.id, p.name)}
+                              disabled={deletingId === p.id}
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+                              title="Delete product"
+                            >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </RoleGuard>
@@ -197,6 +229,20 @@ const Inventory = () => {
               </tbody>
             </table>
           </div>
+
+          {filtered.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between border-t px-4 py-3">
+              <p className="text-xs text-muted-foreground">{filtered.length} total · Page {page} of {totalPages}</p>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" />Previous
+                </Button>
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                  Next<ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {tab === 'all' && (
@@ -206,7 +252,8 @@ const Inventory = () => {
         )}
       </div>
 
-      <AddProductDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={() => queryClient.invalidateQueries({ queryKey: ['inventory'] })} />
+      <AddProductDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={refresh} />
+      <EditProductDialog product={editProduct} onOpenChange={open => { if (!open) setEditProduct(null); }} onSuccess={refresh} />
     </div>
   );
 };

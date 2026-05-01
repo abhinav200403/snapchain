@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     api.get('/auth/me')
       .then((res) => {
         const u = res.data;
-        setUser({ id: u.id, email: u.email, name: u.name, role: u.role, companyId: u.companyId, companyName: u.companyName, isActive: u.isActive });
+        setUser({ id: u.id, email: u.email, name: u.name, role: u.role, companyId: u.companyId, companyName: u.companyName, isActive: u.isActive, emailVerified: u.emailVerified ?? true });
       })
       .catch(() => {
         localStorage.removeItem('access_token');
@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { accessToken, refreshToken, user: u } = res.data;
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('refresh_token', refreshToken);
-    setUser({ id: u.id, email: u.email, name: u.name, role: u.role, companyId: u.companyId, companyName: u.companyName, isActive: true });
+    setUser({ id: u.id, email: u.email, name: u.name, role: u.role, companyId: u.companyId, companyName: u.companyName, isActive: true, emailVerified: u.emailVerified ?? true });
   }, []);
 
   const logout = useCallback(async () => {
@@ -67,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { accessToken, refreshToken, user: u } = res.data;
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('refresh_token', refreshToken);
-    setUser({ id: u.id, email: u.email, name: u.name, role: u.role, companyId: u.companyId, companyName: companyName, isActive: true });
+    setUser({ id: u.id, email: u.email, name: u.name, role: u.role, companyId: u.companyId, companyName: companyName, isActive: true, emailVerified: u.emailVerified ?? false });
   }, []);
 
   return (

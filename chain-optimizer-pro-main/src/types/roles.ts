@@ -9,6 +9,7 @@ export interface User {
   companyName: string;
   avatar?: string;
   isActive: boolean;
+  emailVerified: boolean;
 }
 
 export const ROLE_LABELS: Record<AppRole, string> = {
