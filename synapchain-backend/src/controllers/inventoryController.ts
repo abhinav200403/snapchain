@@ -4,7 +4,10 @@ import { query } from '../config/db';
 // GET /api/inventory
 export async function listProducts(req: Request, res: Response): Promise<void> {
   const result = await query(
-    `SELECT p.id, p.name, p.sku, p.category, p.stock_quantity, p.reorder_level,
+    `SELECT p.id, p.name, p.sku, p.category, p.stock_quantity,
+            COALESCE(p.reserved_quantity, 0) AS reserved_quantity,
+            GREATEST(0, p.stock_quantity - COALESCE(p.reserved_quantity, 0)) AS available_quantity,
+            p.reorder_level,
             p.unit_price, p.supplier_id, s.name AS supplier_name,
             p.stock_quantity <= p.reorder_level AS low_stock,
             p.created_at, p.updated_at
@@ -20,8 +23,31 @@ export async function listProducts(req: Request, res: Response): Promise<void> {
 // POST /api/inventory
 export async function createProduct(req: Request, res: Response): Promise<void> {
   const { name, sku, category, stock_quantity, reorder_level, unit_price, supplier_id } = req.body;
-  if (!name) {
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
     res.status(400).json({ error: 'Product name is required' });
+    return;
+  }
+  if (!sku || typeof sku !== 'string' || !sku.trim()) {
+    res.status(400).json({ error: 'SKU is required' });
+    return;
+  }
+  if (unit_price === undefined || unit_price === null || isNaN(Number(unit_price)) || Number(unit_price) < 0) {
+    res.status(400).json({ error: 'unit_price is required and must be a non-negative number' });
+    return;
+  }
+  if (stock_quantity !== undefined && stock_quantity !== null && Number(stock_quantity) < 0) {
+    res.status(400).json({ error: 'stock_quantity cannot be negative' });
+    return;
+  }
+
+  // Duplicate SKU check within company
+  const dupCheck = await query(
+    'SELECT id FROM products WHERE sku = $1 AND company_id = $2',
+    [sku.trim(), req.user!.companyId]
+  );
+  if (dupCheck.rows.length > 0) {
+    res.status(409).json({ error: `SKU '${sku}' already exists` });
     return;
   }
 
@@ -38,8 +64,8 @@ export async function createProduct(req: Request, res: Response): Promise<void> 
     `INSERT INTO products (company_id, name, sku, category, stock_quantity, reorder_level, unit_price, supplier_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, name, sku, category, stock_quantity, reorder_level, unit_price, supplier_id, created_at`,
-    [req.user!.companyId, name, sku || null, category || null,
-     stock_quantity || 0, reorder_level || 10, unit_price || 0, supplier_id || null]
+    [req.user!.companyId, name.trim(), sku.trim(), category || null,
+     stock_quantity ?? 0, reorder_level ?? 10, unit_price, supplier_id || null]
   );
   res.status(201).json(result.rows[0]);
 }
@@ -48,6 +74,15 @@ export async function createProduct(req: Request, res: Response): Promise<void> 
 export async function updateProduct(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
   const { name, sku, category, stock_quantity, reorder_level, unit_price, supplier_id } = req.body;
+
+  if (stock_quantity !== undefined && stock_quantity !== null && Number(stock_quantity) < 0) {
+    res.status(400).json({ error: 'stock_quantity cannot be negative' });
+    return;
+  }
+  if (unit_price !== undefined && unit_price !== null && Number(unit_price) < 0) {
+    res.status(400).json({ error: 'unit_price cannot be negative' });
+    return;
+  }
 
   const result = await query(
     `UPDATE products SET

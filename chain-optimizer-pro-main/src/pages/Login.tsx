@@ -24,8 +24,9 @@ const Login = () => {
     try {
       await login(email, password);
       navigate('/dashboard');
-    } catch {
-      toast.error('Invalid email or password');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Login failed';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -36,8 +37,9 @@ const Login = () => {
     try {
       await switchRole(role);
       navigate('/dashboard');
-    } catch {
-      toast.error('Demo login failed');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Demo login failed';
+      toast.error(msg);
     } finally {
       setDemoLoading(null);
     }

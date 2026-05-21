@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/hooks/useSocket';
 import { MailWarning, X } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
@@ -50,6 +51,9 @@ const VerificationBanner = () => {
 
 const AppContent = () => {
   const { collapsed } = useSidebar();
+  // Establish WebSocket connection for real-time updates
+  useSocket();
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />

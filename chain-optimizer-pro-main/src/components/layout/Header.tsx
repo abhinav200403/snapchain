@@ -4,14 +4,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { ROLE_LABELS } from '@/types/roles';
-import { Bell, Search, Sun, Moon, X, AlertTriangle, ShoppingCart, Truck, Info, CheckCheck } from 'lucide-react';
+import { Bell, Search, Sun, Moon, X, AlertTriangle, ShoppingCart, Truck, Info, CheckCheck, PackageX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
 
 const notifIcon = (type: string) => {
   if (type === 'low_stock') return <AlertTriangle className="h-4 w-4 text-warning" />;
   if (type === 'order_pending') return <ShoppingCart className="h-4 w-4 text-info" />;
+  if (type === 'order_fulfillment') return <ShoppingCart className="h-4 w-4 text-warning" />;
   if (type === 'shipment_delayed') return <Truck className="h-4 w-4 text-destructive" />;
+  if (type === 'fulfillment_rejected') return <PackageX className="h-4 w-4 text-destructive" />;
   return <Info className="h-4 w-4 text-muted-foreground" />;
 };
 
@@ -34,7 +36,11 @@ const useGlobalSearch = () => {
       ]);
       const hits: any[] = [
         ...(inv as any[]).filter((p: any) => p.name?.toLowerCase().includes(q)).map((p: any) => ({ type: 'product', label: p.name, sub: `SKU: ${p.sku}`, path: '/inventory' })),
-        ...(ord as any[]).filter((o: any) => o.id?.toLowerCase().includes(q) || o.supplier_name?.toLowerCase().includes(q)).map((o: any) => ({ type: 'order', label: `Order #${o.id.slice(0, 8).toUpperCase()}`, sub: o.supplier_name ?? '', path: '/orders' })),
+        ...(ord as any[]).filter((o: any) =>
+          o.id?.toLowerCase().includes(q) ||
+          o.po_number?.toLowerCase().includes(q) ||
+          o.supplier_name?.toLowerCase().includes(q)
+        ).map((o: any) => ({ type: 'order', label: `Order #${o.po_number ?? o.id.slice(0, 8).toUpperCase()}`, sub: o.supplier_name ?? '', path: '/orders' })),
         ...(sup as any[]).filter((s: any) => s.name?.toLowerCase().includes(q)).map((s: any) => ({ type: 'supplier', label: s.name, sub: s.email ?? '', path: '/suppliers' })),
       ].slice(0, 8);
       setResults(hits);
@@ -49,7 +55,7 @@ const useGlobalSearch = () => {
 export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
+  const { notifications, unreadCount, markAllRead, markRead } = useNotifications(user?.role ?? 'business_analyst');
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const { query, setQuery, results, loading } = useGlobalSearch();
@@ -158,7 +164,7 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
                 ) : notifications.map(n => (
                   <button
                     key={n.id}
-                    onClick={() => markRead(n.id)}
+                    onClick={() => { markRead(n.id); if (n.link) { navigate(n.link); setNotifOpen(false); } }}
                     className={cn(
                       'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-secondary border-b last:border-0',
                       !n.read && 'bg-primary/5'

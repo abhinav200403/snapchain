@@ -113,25 +113,51 @@ export async function generateRiskAssessment(companyId: string): Promise<object>
     ),
   ]);
 
-  // Rule-based risk scoring
+  // Rule-based risk scoring — return in the shape AiInsightsPanel expects
   const risks: object[] = [];
 
   for (const sup of suppliers.rows) {
     const score = calculateSupplierRisk(sup);
-    risks.push({ type: 'supplier', name: sup.name, risk_level: score.level, reasons: score.reasons });
+    if (score.reasons.length > 0) {
+      risks.push({
+        risk_level: score.level,
+        message: score.reasons.join('; '),
+        product_name: sup.name,
+        risk_type: 'supplier',
+        recommendation:
+          score.level === 'high'
+            ? 'Review supplier performance and consider alternative sourcing'
+            : 'Monitor supplier closely and verify upcoming deliveries',
+      });
+    }
   }
 
   const invStats = inventory.rows[0];
   if (Number(invStats.out_of_stock) > 0) {
-    risks.push({ type: 'inventory', risk_level: 'high', reasons: [`${invStats.out_of_stock} products out of stock`] });
+    risks.push({
+      risk_level: 'high',
+      message: `${invStats.out_of_stock} product${Number(invStats.out_of_stock) > 1 ? 's' : ''} currently out of stock`,
+      risk_type: 'inventory',
+      recommendation: 'Initiate emergency reorder to restore stock levels immediately',
+    });
   }
   if (Number(invStats.low_stock) > 0) {
-    risks.push({ type: 'inventory', risk_level: 'medium', reasons: [`${invStats.low_stock} products below reorder level`] });
+    risks.push({
+      risk_level: 'medium',
+      message: `${invStats.low_stock} product${Number(invStats.low_stock) > 1 ? 's' : ''} below reorder threshold`,
+      risk_type: 'inventory',
+      recommendation: 'Create purchase orders before stock reaches critical levels',
+    });
   }
 
   const shipStats = shipments.rows[0];
   if (Number(shipStats.delayed) > 0) {
-    risks.push({ type: 'shipment', risk_level: 'high', reasons: [`${shipStats.delayed} shipments currently delayed`] });
+    risks.push({
+      risk_level: 'high',
+      message: `${shipStats.delayed} shipment${Number(shipStats.delayed) > 1 ? 's' : ''} currently delayed`,
+      risk_type: 'shipment',
+      recommendation: 'Contact carriers to investigate delay causes and update delivery estimates',
+    });
   }
 
   return {
@@ -139,7 +165,7 @@ export async function generateRiskAssessment(companyId: string): Promise<object>
     summary: {
       high_risk_count: risks.filter((r: any) => r.risk_level === 'high').length,
       medium_risk_count: risks.filter((r: any) => r.risk_level === 'medium').length,
-      shipment_stats: shipStats.rows ? shipStats.rows[0] : shipStats,
+      shipment_stats: shipStats,
       inventory_stats: invStats,
     },
     generated_at: new Date().toISOString(),

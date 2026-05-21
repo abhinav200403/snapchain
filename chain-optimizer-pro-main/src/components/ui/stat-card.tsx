@@ -16,12 +16,16 @@ interface StatCardProps {
 export const StatCard: React.FC<StatCardProps> = ({
   label, value, change, changeType = 'neutral', icon: Icon, className, delay = 0, onClick, clickable
 }) => {
+  const isClickable = !!(onClick || clickable);
   return (
     <div
       onClick={onClick}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable && onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
       className={cn(
-        'group rounded-xl border bg-card p-5 shadow-sm transition-shadow duration-200 hover:shadow-md opacity-0 animate-fade-in-up',
-        clickable && 'cursor-pointer hover:border-destructive/60 hover:shadow-destructive/10',
+        'group rounded-xl border bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md opacity-0 animate-fade-in-up',
+        isClickable && 'cursor-pointer hover:border-primary/40 hover:ring-1 hover:ring-primary/20 active:scale-[0.98]',
         className
       )}
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
@@ -41,8 +45,14 @@ export const StatCard: React.FC<StatCardProps> = ({
             </p>
           )}
         </div>
-        <div className="rounded-lg bg-secondary p-2.5 transition-colors group-hover:bg-primary/10">
-          <Icon className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
+        <div className={cn(
+          'rounded-lg bg-secondary p-2.5 transition-colors',
+          isClickable && 'group-hover:bg-primary/10'
+        )}>
+          <Icon className={cn(
+            'h-5 w-5 text-muted-foreground transition-colors',
+            isClickable && 'group-hover:text-primary'
+          )} />
         </div>
       </div>
     </div>

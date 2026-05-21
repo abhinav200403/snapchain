@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,16 @@ type Tab = 'all' | 'low_stock';
 const PAGE_SIZE = 10;
 
 const Inventory = () => {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = useState<Tab>(() =>
+    searchParams.get('tab') === 'low_stock' ? 'low_stock' : 'all'
+  );
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'low_stock' || t === 'all') setTab(t);
+  }, [searchParams]);
   const [addOpen, setAddOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -167,7 +176,9 @@ const Inventory = () => {
                   <th className="px-4 py-3 font-medium">Product</th>
                   <th className="px-4 py-3 font-medium">SKU</th>
                   <th className="px-4 py-3 font-medium">Category</th>
-                  <th className="px-4 py-3 font-medium">Stock</th>
+                  <th className="px-4 py-3 font-medium">Total Stock</th>
+                  <th className="px-4 py-3 font-medium">Reserved</th>
+                  <th className="px-4 py-3 font-medium">Available</th>
                   <th className="px-4 py-3 font-medium">Threshold</th>
                   <th className="px-4 py-3 font-medium">Price</th>
                   <th className="px-4 py-3 font-medium">Status</th>
@@ -176,9 +187,9 @@ const Inventory = () => {
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
+                  <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
                 ) : paginated.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                  <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                     {tab === 'low_stock' ? 'No low stock items — all products are well stocked!' : 'No products found'}
                   </td></tr>
                 ) : paginated.map((p: any) => {
@@ -193,6 +204,18 @@ const Inventory = () => {
                       <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{p.sku}</td>
                       <td className="px-4 py-3 text-foreground">{p.category}</td>
                       <td className="px-4 py-3 tabular-nums text-foreground font-medium">{p.stock_quantity}</td>
+                      <td className="px-4 py-3 tabular-nums">
+                        {Number(p.reserved_quantity) > 0 ? (
+                          <span className="font-medium text-warning">{p.reserved_quantity}</span>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums">
+                        <span className={Number(p.available_quantity) <= 0 ? 'font-semibold text-destructive' : 'font-medium text-success'}>
+                          {p.available_quantity ?? p.stock_quantity}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 tabular-nums text-muted-foreground">{p.reorder_level}</td>
                       <td className="px-4 py-3 tabular-nums text-foreground">${Number(p.unit_price).toFixed(2)}</td>
                       <td className="px-4 py-3">

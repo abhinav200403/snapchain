@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useQuery } from '@tanstack/react-query';
 import type { AppRole } from '@/types/roles';
 import { ROLE_LABELS } from '@/types/roles';
 import {
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/contexts/SidebarContext';
+import api from '@/lib/api';
 
 interface NavItem {
   label: string;
@@ -33,11 +35,32 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Billing', path: '/billing', icon: CreditCard, roles: ['admin', 'operations_manager', 'supplier', 'business_analyst'] },
 ];
 
+const useNavBadges = (role: AppRole) => {
+  const { data: orders = [] } = useQuery({
+    queryKey: ['orders'],
+    queryFn: () => api.get('/orders').then(r => r.data),
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+
+  const isAdminOrOps = role === 'admin' || role === 'operations_manager';
+  const isSupplier = role === 'supplier';
+
+  const ordersBadge = isAdminOrOps
+    ? (orders as any[]).filter(o => o.status === 'pending_approval').length
+    : isSupplier
+    ? (orders as any[]).filter(o => o.status === 'awaiting_supplier_confirmation').length
+    : 0;
+
+  return { '/orders': ordersBadge > 0 ? ordersBadge : undefined };
+};
+
 export const Sidebar = () => {
   const { user, logout, switchRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { collapsed, setCollapsed } = useSidebar();
   const location = useLocation();
+  const badges = useNavBadges(user?.role ?? 'business_analyst');
 
   if (!user) return null;
 
@@ -79,8 +102,20 @@ export const Sidebar = () => {
                       : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   )}
                 >
-                  <item.icon className="h-[18px] w-[18px] shrink-0" />
-                  {!collapsed && <span className="animate-fade-in">{item.label}</span>}
+                  <div className="relative shrink-0">
+                    <item.icon className="h-[18px] w-[18px]" />
+                    {badges[item.path as keyof typeof badges] !== undefined && (
+                      <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white">
+                        {(badges[item.path as keyof typeof badges] as number) > 9 ? '9+' : badges[item.path as keyof typeof badges]}
+                      </span>
+                    )}
+                  </div>
+                  {!collapsed && <span className="animate-fade-in flex-1">{item.label}</span>}
+                  {!collapsed && badges[item.path as keyof typeof badges] !== undefined && (
+                    <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-white animate-fade-in">
+                      {(badges[item.path as keyof typeof badges] as number) > 99 ? '99+' : badges[item.path as keyof typeof badges]}
+                    </span>
+                  )}
                 </NavLink>
               </li>
             );

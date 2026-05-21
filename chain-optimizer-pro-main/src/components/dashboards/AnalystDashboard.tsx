@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { StatCard } from '@/components/ui/stat-card';
+import { AiInsightsPanel } from '@/components/dashboard/AiInsightsPanel';
 import { BarChart3, TrendingUp, Users, Brain } from 'lucide-react';
 import {
   ComposedChart, Bar, Line, BarChart,
@@ -46,6 +48,7 @@ const ratingColor = (rating: number) => {
 };
 
 export const AnalystDashboard = () => {
+  const navigate = useNavigate();
   const { data: overview } = useQuery({
     queryKey: ['analytics-overview'],
     queryFn: () => api.get('/analytics/overview').then(r => r.data),
@@ -85,11 +88,18 @@ export const AnalystDashboard = () => {
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={BarChart3} label="Total Revenue" value={o.total_revenue ? `$${(Number(o.total_revenue) / 1000).toFixed(0)}K` : '—'} change="All time" changeType="positive" delay={0} />
-        <StatCard icon={TrendingUp} label="Total Orders" value={o.total_orders ?? '—'} change="All time" changeType="positive" delay={60} />
-        <StatCard icon={Users} label="Active Suppliers" value={sup.total_suppliers ?? '—'} change="In network" changeType="positive" delay={120} />
-        <StatCard icon={Brain} label="Low Stock Alerts" value={inv.low_stock_count ?? '—'} change="Needs attention" changeType="neutral" delay={180} />
+        <StatCard icon={BarChart3} label="Total Revenue" value={o.total_revenue ? `$${(Number(o.total_revenue) / 1000).toFixed(0)}K` : '—'} change="View analytics →" changeType="positive" delay={0}
+          onClick={() => navigate('/analytics')} />
+        <StatCard icon={TrendingUp} label="Total Orders" value={o.total_orders ?? '—'} change="View all orders →" changeType="positive" delay={60}
+          onClick={() => navigate('/orders')} />
+        <StatCard icon={Users} label="Active Suppliers" value={sup.total_suppliers ?? '—'} change="Supplier performance →" changeType="positive" delay={120}
+          onClick={() => navigate('/suppliers')} />
+        <StatCard icon={Brain} label="Low Stock Alerts" value={inv.low_stock_count ?? '—'} change={inv.low_stock_count > 0 ? 'View low stock items →' : 'All levels healthy'} changeType={inv.low_stock_count > 0 ? 'negative' : 'neutral'} delay={180}
+          onClick={() => navigate(inv.low_stock_count > 0 ? '/inventory?tab=low_stock' : '/inventory')} />
       </div>
+
+      {/* AI Insights */}
+      <AiInsightsPanel />
 
       {/* Order Volume & Revenue Trend */}
       <div className="rounded-xl border bg-card p-5 opacity-0 animate-fade-in-up" style={{ animationDelay: '240ms', animationFillMode: 'forwards' }}>

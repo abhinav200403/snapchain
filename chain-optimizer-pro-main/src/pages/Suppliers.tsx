@@ -4,7 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RoleGuard } from '@/components/RoleGuard';
-import { Plus, Search, Star, Clock, Download, BarChart3, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Star, Clock, Download, BarChart3, CheckCircle2, XCircle, ChevronLeft, ChevronRight, X, TrendingUp, Award } from 'lucide-react';
 import { AddSupplierDialog } from '@/components/modals/AddSupplierDialog';
 import { exportCSV } from '@/lib/export';
 import { toast } from 'sonner';
@@ -13,11 +13,139 @@ import api from '@/lib/api';
 type Tab = 'cards' | 'scorecard';
 const PAGE_SIZE = 8;
 
+// ─── Supplier Scorecard Drawer ────────────────────────────────────────────────
+
+interface ScorecardDrawerProps {
+  supplierId: string | null;
+  onClose: () => void;
+}
+
+const gradeColors: Record<string, string> = {
+  Excellent: 'bg-success/10 text-success border-success/30',
+  Good:      'bg-info/10 text-info border-info/30',
+  Average:   'bg-warning/10 text-warning border-warning/30',
+  Poor:      'bg-destructive/10 text-destructive border-destructive/30',
+};
+
+const ScorecardDrawer: React.FC<ScorecardDrawerProps> = ({ supplierId, onClose }) => {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['supplier-scorecard', supplierId],
+    queryFn: () => api.get(`/suppliers/${supplierId}/scorecard`).then(r => r.data),
+    enabled: !!supplierId,
+  });
+
+  if (!supplierId) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-background shadow-2xl">
+        <div className="flex items-center justify-between border-b p-5">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <h2 className="text-base font-semibold text-foreground">Supplier Scorecard</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1,2,3,4].map(i => <div key={i} className="h-16 rounded-xl bg-secondary animate-pulse" />)}
+            </div>
+          ) : isError ? (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+              Failed to load scorecard data
+            </div>
+          ) : data ? (
+            <>
+              {/* Supplier info */}
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-foreground">{data.supplier?.name}</h3>
+                    {data.supplier?.email && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{data.supplier.email}</p>
+                    )}
+                  </div>
+                  <div className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 ${gradeColors[data.performance_grade] ?? 'bg-muted text-muted-foreground'}`}>
+                    <Award className="h-4 w-4" />
+                    <span className="text-sm font-bold">{data.performance_grade}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* KPI Cards grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Total Orders', value: data.total_orders, unit: '', color: 'text-foreground', bg: 'bg-secondary/60' },
+                  { label: 'Delivered', value: data.delivered_orders, unit: '', color: 'text-success', bg: 'bg-success/5' },
+                  { label: 'Acceptance Rate', value: `${data.acceptance_rate}%`, unit: '', color: 'text-info', bg: 'bg-info/5' },
+                  { label: 'Rejection Rate', value: `${data.rejection_rate}%`, unit: '', color: data.rejection_rate > 20 ? 'text-destructive' : 'text-muted-foreground', bg: data.rejection_rate > 20 ? 'bg-destructive/5' : 'bg-secondary/60' },
+                  { label: 'On-Time Delivery', value: `${data.on_time_delivery_rate}%`, unit: '', color: 'text-success', bg: 'bg-success/5' },
+                  { label: 'Avg Fulfillment', value: data.avg_fulfillment_days ? `${data.avg_fulfillment_days}d` : '—', unit: '', color: 'text-foreground', bg: 'bg-secondary/60' },
+                ].map(kpi => (
+                  <div key={kpi.label} className={`rounded-xl p-3 ${kpi.bg}`}>
+                    <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                    <p className={`text-xl font-bold mt-0.5 ${kpi.color}`}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total Revenue */}
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Revenue Handled</p>
+                    <p className="text-2xl font-bold text-foreground mt-0.5">
+                      ${Number(data.total_revenue).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Acceptance rate visual */}
+              <div className="rounded-xl border bg-card p-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">Acceptance Rate</span>
+                  <span className="font-bold text-foreground">{data.acceptance_rate}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      data.acceptance_rate >= 80 ? 'bg-success' :
+                      data.acceptance_rate >= 60 ? 'bg-info' :
+                      data.acceptance_rate >= 40 ? 'bg-warning' : 'bg-destructive'
+                    }`}
+                    style={{ width: `${data.acceptance_rate}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{data.accepted_orders} accepted</span>
+                  <span>{data.rejected_orders} rejected</span>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ─── Main Suppliers Component ─────────────────────────────────────────────────
+
 const Suppliers = () => {
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('cards');
   const [page, setPage] = useState(1);
+  const [scorecardSupplierId, setScorecardSupplierId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: suppliers = [], isLoading } = useQuery({
@@ -91,7 +219,12 @@ const Suppliers = () => {
           <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
             {paginated.map((s: any, i: number) => (
-              <div key={s.id} className="rounded-xl border bg-card p-5 opacity-0 animate-fade-in-up transition-shadow hover:shadow-md" style={{ animationDelay: `${i * 80}ms`, animationFillMode: 'forwards' }}>
+              <div
+                key={s.id}
+                className="rounded-xl border bg-card p-5 opacity-0 animate-fade-in-up transition-shadow hover:shadow-md cursor-pointer"
+                style={{ animationDelay: `${i * 80}ms`, animationFillMode: 'forwards' }}
+                onClick={() => setScorecardSupplierId(s.id)}
+              >
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">{s.name}</h3>
@@ -119,6 +252,14 @@ const Suppliers = () => {
                       <p className="text-sm font-bold text-foreground">{s.is_active ? 'Active' : 'Inactive'}</p>
                     </div>
                     <p className="text-[11px] text-muted-foreground">Status</p>
+                  </div>
+                  <div className="ml-auto">
+                    <button
+                      onClick={e => { e.stopPropagation(); setScorecardSupplierId(s.id); }}
+                      className="flex items-center gap-1 rounded-md bg-primary/5 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <BarChart3 className="h-3 w-3" />Scorecard
+                    </button>
                   </div>
                 </div>
               </div>
@@ -172,6 +313,7 @@ const Suppliers = () => {
                       <th className="px-4 py-3 font-medium">Lead Time</th>
                       <th className="px-4 py-3 font-medium">Performance</th>
                       <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -210,6 +352,14 @@ const Suppliers = () => {
                               s.is_active ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
                             }`}>{s.is_active ? 'Active' : 'Inactive'}</span>
                           </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => setScorecardSupplierId(s.id)}
+                              className="flex items-center gap-1 rounded-md bg-primary/5 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                            >
+                              <BarChart3 className="h-3 w-3" />Details
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -222,6 +372,8 @@ const Suppliers = () => {
       </div>
 
       <AddSupplierDialog open={addOpen} onOpenChange={setAddOpen} onSuccess={() => queryClient.invalidateQueries({ queryKey: ['suppliers'] })} />
+
+      <ScorecardDrawer supplierId={scorecardSupplierId} onClose={() => setScorecardSupplierId(null)} />
     </div>
   );
 };
