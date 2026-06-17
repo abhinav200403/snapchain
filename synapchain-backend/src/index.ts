@@ -32,34 +32,74 @@ const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Security & logging
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
-// CORS — allow any localhost port in development
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || /^http:\/\/localhost:\d+$/.test(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-}));
+app.use(
+  morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined')
+);
 
-// Body parsing — increased limit for base64 uploads
+// ===========================
+// CORS Configuration
+// ===========================
+
+const allowedOrigins = [
+  process.env.CLIENT_URL,          // Production frontend
+  'http://localhost:5173',         // Vite
+  'http://localhost:3000',         // React
+  'http://localhost:8080',         // Optional
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow Postman/mobile apps/no-origin requests
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
+
+// ===========================
+// Body Parser
+// ===========================
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-// Serve uploaded files statically
+// ===========================
+// Static Files
+// ===========================
+
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// Health check
+// ===========================
+// Health Check
+// ===========================
+
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), env: process.env.NODE_ENV });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV,
+  });
 });
 
+// ===========================
 // API Routes
+// ===========================
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/suppliers', supplierRoutes);
@@ -75,21 +115,44 @@ app.use('/api/attachments', attachmentsRoutes);
 app.use('/api/sla', slaRoutes);
 app.use('/api/approval-rules', approvalRulesRoutes);
 
+// ===========================
 // 404
+// ===========================
+
 app.use((_req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+  res.status(404).json({
+    error: 'Route not found',
+  });
 });
 
-// Global error handler
+// ===========================
+// Error Handler
+// ===========================
+
 app.use(errorHandler);
 
-// Initialize Socket.IO
+// ===========================
+// Socket.IO
+// ===========================
+
 initSocket(httpServer);
 
-runMigrations().catch(err => console.error('Migration error:', err.message));
+// ===========================
+// Database Migration
+// ===========================
+
+runMigrations().catch((err) => {
+  console.error('Migration error:', err.message);
+});
+
+// ===========================
+// Start Server
+// ===========================
 
 httpServer.listen(PORT, () => {
-  console.log(`SynapChain API running on port ${PORT} [${process.env.NODE_ENV}]`);
+  console.log(
+    `🚀 SynapChain API running on port ${PORT} [${process.env.NODE_ENV}]`
+  );
 });
 
 export default app;
